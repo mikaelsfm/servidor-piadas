@@ -1,47 +1,57 @@
 import socket
 import threading
+import time
 
-def handle_client(client_socket):
-    # # Bilheteria
-    # client_socket.send(b"Bem-vindo a bilheteria do teatro!\n")
+def box_office(conn):
+    # Bilheteria
+    conn.send(b"Gostaria de ouvir nosso show de uma piada so?\n")
+    box_response = conn.recv(1024)
     
-    # # Fila de espera
-    # client_socket.send(b"Voce esta na fila de espera...\n")
+    if box_response.strip().lower() == b"sim":
+        conn.send(b"Por favor aguarde que logo sera chamado")
+        return
     
-    # # Entrando no teatro
-    # client_socket.send(b"Voce entrou no teatro!\n")
-    
-    # Piada de Knock Knock
-    client_socket.send(b"Knock knock!\n")
-    response = client_socket.recv(1024)
-    
-    if response.strip().lower() == b"who's there?":
-        client_socket.send(b"Art.\n")
-        response = client_socket.recv(1024)
+
+def theater_joke(conn):
+    global seat_count
+    seat_count += 1
+    conn.send(b"Voce entrou no teatro! Sente-se que a piada vai comecar\n")
+    time.sleep(5)
         
-        if response.strip().lower() == b"art who?":
-            client_socket.send(b"R2-D2\n")
-            
-        else:
-            client_socket.send(b"Desculpe, eu me perdi na piada, vamos de novo?\n")
-    else:
-        client_socket.send(b"Desculpe, eu me perdi na piada!\n")
+    # Piada de Knock Knock
+    conn.send(b"Knock knock!\n")
+    joke_response = conn.recv(1024)
     
-    client_socket.close()
+    if joke_response.strip().lower() == b"who's there?":
+        conn.send(b"Art\n")
+        joke_response = conn.recv(1024)
+        
+        if joke_response.strip().lower() == b"art who?":
+            conn.send(b"R2-D2!\n")
+            time.sleep(2)
+            conn.send(b"Obrigado e volte sempre!")
+    seat_count -= 1
+    conn.close()
 
 def main():
     # Configurando o servidor
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind(("0.0.0.0", 8085))
-    server.listen(5)
+    server.bind(("127.0.0.1", 8085))
+    server.listen()
+    
+    seat_count = 0
+    max_seat = 2
     
     while True:
-        client_socket, addr = server.accept()
-        print(f"Cliente {addr[0]}:{addr[1]}")
         
-        # Iniciando uma thread para lidar com o cliente
-        client_handler = threading.Thread(target=handle_client, args=(client_socket))
-        client_handler.start()
+        conn, addr = server.accept()
 
-if __name__ == "__main__":
-    main()
+        get_ticket = threading.Thread(target=box_office, args=(conn,))
+        get_ticket.start()
+        
+        if seat_count <= max_seat:
+            # Iniciando uma thread para lidar com o cliente
+            client_handler = threading.Thread(target=theater_joke, args=(conn,))
+            client_handler.start()
+
+main()
